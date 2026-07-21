@@ -13,6 +13,7 @@ class TrainParameters:
     rationalization_type: str = "ternary"
     sparsity_type: str = "sqrt"
     max_abs_value: float = 3.0
+    als_probability: float = 0.0
 
     @staticmethod
     def default() -> TrainParameters:
@@ -22,7 +23,18 @@ class TrainParameters:
             w_sparsity=lambda t: 0.008 * t,
             w_magnitude=lambda t: 0.1 * t,
             w_balance=lambda t: 0.01,
-            rationalization_type="random",
+            rationalization_type="ternary",
             sparsity_type="sqrt",
-            max_abs_value=2.0
+            max_abs_value=2.0,
+            als_probability=0.75
+        )
+
+    @staticmethod
+    def balance_only(end_part: float = 0.4, weight: float = 0.01) -> TrainParameters:
+        return TrainParameters(
+            end_part=end_part,
+            w_rationalization=lambda t: 0,
+            w_sparsity=lambda t: 0,
+            w_magnitude=lambda t: 0,
+            w_balance=lambda t: weight,
         )

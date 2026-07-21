@@ -1,4 +1,5 @@
 import os.path
+import random
 
 import torch
 
@@ -22,9 +23,19 @@ class DecompositionSolver:
         self.best_errors = torch.full((self.batch_size,), float('inf'), dtype=torch.float64, device=self.device)
         self.verified_mask = torch.zeros(self.batch_size, dtype=torch.bool, device=self.device)
 
-    def train_step(self, step: int, steps: int) -> float:
-        self.optimizer.zero_grad()
+    def step(self, step: int, steps: int) -> float:
         parameters, t = self.strategy.get(step=step, steps=steps)
+        loss = self.__train_step(parameters=parameters, t=t)
+        self.__verify()
+
+        if random.random() < parameters.als_probability:
+            self.decomposition.als(target=self.T)
+            self.__verify()
+
+        return loss
+
+    def __train_step(self, parameters: TrainParameters, t: float) -> float:
+        self.optimizer.zero_grad()
         loss = self.__get_loss(parameters=parameters, t=t)
         loss = loss.sum()
         loss.backward()
@@ -33,7 +44,7 @@ class DecompositionSolver:
         self.optimizer.step()
         return loss.item() / self.batch_size
 
-    def verify(self) -> None:
+    def __verify(self) -> None:
         for scale in self.strategy.scales:
             self.__check_rationalized(scale=scale)
 
