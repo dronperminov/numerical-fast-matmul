@@ -5,18 +5,12 @@ import torch
 
 
 class Decomposition:
-    def __init__(self, n: int, m: int, p: int, rank: int, data_type: str, batch_size: int, device: str):
+    def __init__(self, n: int, m: int, p: int, rank: int, dtype: torch.dtype, batch_size: int, device: str):
         self.dimension = [n, m, p]
         self.elements = [n * m, m * p, p * n]
         self.rank = rank
 
-        data_type2dtype = {
-            "float32": torch.float32,
-            "float64": torch.float64,
-            "complex64": torch.complex64,
-            "complex128": torch.complex128
-        }
-        self.dtype = data_type2dtype[data_type]
+        self.dtype = dtype
         self.batch_size = batch_size
         self.device = device
 

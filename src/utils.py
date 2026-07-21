@@ -4,6 +4,16 @@ from typing import Set, Union
 import torch
 
 
+def get_dtype(data_type: str) -> torch.dtype:
+    data_type2dtype = {
+        "float32": torch.float32,
+        "float64": torch.float64,
+        "complex64": torch.complex64,
+        "complex128": torch.complex128
+    }
+    return data_type2dtype[data_type]
+
+
 def get_matmul_tensor(n: int, m: int, p: int, device: str) -> torch.Tensor:
     tensor = torch.zeros((n * m, m * p, p * n), dtype=torch.float64, device=device)
 
