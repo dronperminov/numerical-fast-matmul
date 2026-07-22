@@ -1,4 +1,4 @@
-from typing import List
+from typing import Dict, List
 
 import torch
 
@@ -16,10 +16,15 @@ class StrategyComparator:
 
         self.solvers = []
         self.label_len = max(8, max(len(strategy.label) for strategy in strategies))
-        self.verified = {strategy.label: 0 for strategy in self.strategies}
         self.verified_total = {strategy.label: 0 for strategy in self.strategies}
+        self.label2count = self.__get_labels_count()
+        self.runs = 0
 
     def run(self, epoches: int, steps: int, log_period: int, print_verified: bool) -> None:
+        self.decomposition.initialize()
+        self.solvers = [DecompositionSolver(self.decomposition.copy(), strategy, self.T, self.output_dir) for strategy in self.strategies]
+        self.runs += 1
+
         for epoch in range(epoches):
             for step in range(steps):
                 self.__step(step, steps, print_verified=print_verified)
@@ -30,37 +35,43 @@ class StrategyComparator:
         for solver in self.solvers:
             self.verified_total[solver.strategy.label] += solver.verified_count()
 
-    def reset(self) -> None:
-        self.decomposition.initialize()
-        self.solvers = [DecompositionSolver(self.decomposition.copy(), strategy, self.T, self.output_dir) for strategy in self.strategies]
-
     def __step(self, step: int, steps: int, print_verified: bool = True) -> None:
         for solver in self.solvers:
             solver.step(step=step, steps=steps, print_verified=print_verified)
 
     def __status(self, epoch: int, step: int, steps: int) -> None:
         n, m, p = self.decomposition.dimension
-        print(f"\n({n}, {m}, {p}: {self.decomposition.rank}): epoch {epoch + 1}, step {step} / {steps}")
-
-        self.__update_verified_count()
-
+        print(f"\n({n}, {m}, {p}: {self.decomposition.rank}): run: {self.runs}, epoch {epoch + 1}, step {step} / {steps}")
         print(f'| {"strategy":{self.label_len}} | reconstruction | rounded recons. (mean / min / best) | rationalization | magnitude |   balance   | verified |')
         print(f'+-{"-" * self.label_len}-+----------------+-------------------------------------+-----------------+-----------+-------------+----------+')
 
-        for solver in sorted(self.solvers, key=lambda s: (-self.verified[s.strategy.label], s.strategy.label, s.verified_count())):
+        verified = self.__get_verified_count()
+        for solver in sorted(self.solvers, key=lambda s: (-verified[s.strategy.label], s.strategy.label, -s.verified_count())):
             print(f"| {solver.strategy.label:{self.label_len}} ", end="")
             solver.status()
 
         print(f'+-{"-" * self.label_len}-+----------------+-------------------------------------+-----------------+-----------+-------------+----------+')
-        if sum(self.verified.values()) + sum(self.verified_total.values()) == 0:
+
+        total = {label: total + verified[label]  for label, total in self.verified_total.items()}
+        if sum(total.values()) == 0:
             return
 
-        for label, count in sorted(self.verified.items(), key=lambda item: (-item[1], item[0])):
-            print(f"{label}: {count} schemes (total: {count + self.verified_total[label]})")
+        for label, count in sorted(total.items(), key=lambda item: (-item[1], item[0])):
+            if count:
+                mean = self.verified_total[label] / (self.runs * self.label2count[label])
+                print(f"{label}: {verified[label]} schemes (total: {count}, mean: {mean:.1f})")
 
-    def __update_verified_count(self) -> None:
-        for strategy in self.strategies:
-            self.verified[strategy.label] = 0
+    def __get_verified_count(self) -> Dict[str, int]:
+        verified = {label: 0 for label in self.verified_total}
 
         for solver in self.solvers:
-            self.verified[solver.strategy.label] += solver.verified_count()
+            verified[solver.strategy.label] += solver.verified_count()
+
+        return verified
+
+    def __get_labels_count(self) -> Dict[str, int]:
+        label2count = {label: 0 for label in self.verified_total}
+        for strategy in self.strategies:
+            label2count[strategy.label] += 1
+
+        return label2count

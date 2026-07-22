@@ -28,7 +28,7 @@ class Decomposition:
         self.v.requires_grad_(True)
         self.w.requires_grad_(True)
 
-    def copy(self) -> Decomposition:
+    def copy(self) -> "Decomposition":
         n, m, p = self.dimension
         decomposition = Decomposition(n=n, m=m, p=p, rank=self.rank, dtype=self.dtype, batch_size=self.batch_size, device=self.device)
 

@@ -16,7 +16,7 @@ class TrainParameters:
     als_probability: float = 0.0
 
     @staticmethod
-    def default() -> TrainParameters:
+    def default() -> "TrainParameters":
         return TrainParameters(
             end_part=1.0,
             w_rationalization=lambda t: 0.5 * t * t * (1 + math.sin(10 * math.pi * t * t)) / 2,
@@ -30,7 +30,7 @@ class TrainParameters:
         )
 
     @staticmethod
-    def balance_only(end_part: float = 0.4, weight: float = 0.01) -> TrainParameters:
+    def balance_only(end_part: float = 0.4, weight: float = 0.01) -> "TrainParameters":
         return TrainParameters(
             end_part=end_part,
             w_rationalization=lambda t: 0,

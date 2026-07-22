@@ -1,4 +1,3 @@
-
 import argparse
 import math
 import os.path
@@ -57,12 +56,12 @@ def init_strategies(learning_rate: float) -> List[TrainStrategy]:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-n", help="n", type=int, default=2)
-    parser.add_argument("-m", help="m", type=int, default=4)
-    parser.add_argument("-p", help="p", type=int, default=5)
-    parser.add_argument("--rank", help="decomposition rank", type=int, default=32)
+    parser.add_argument("-n", help="n", type=int, default=3)
+    parser.add_argument("-m", help="m", type=int, default=3)
+    parser.add_argument("-p", help="p", type=int, default=3)
+    parser.add_argument("--rank", help="decomposition rank", type=int, default=23)
     parser.add_argument("--data-type", help="coefficients type", choices=["complex64", "complex128", "float32", "float64"], default="float32")
-    parser.add_argument("--batch-size", help="batch size", type=int, default=1024)
+    parser.add_argument("--batch-size", help="batch size", type=int, default=2048)
     parser.add_argument("--device", help="torch device", type=str, default="cuda")
     parser.add_argument("--learning-rate", help="learning rate", type=int, default=0.1)
     parser.add_argument("--steps", help="steps per epoch", type=int, default=2000)
@@ -95,8 +94,7 @@ def main():
     comparator = StrategyComparator(decomposition=decomposition, strategies=strategies, T=target_tensor, output_dir=output_dir)
 
     while True:
-        comparator.reset()
-        comparator.run(epoches=args.epoches, steps=args.steps, log_period=args.log_period, print_verified=True)
+        comparator.run(epoches=args.epoches, steps=args.steps, log_period=args.log_period, print_verified=False)
 
 
 if __name__ == '__main__':
