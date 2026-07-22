@@ -1,4 +1,3 @@
-import random
 from typing import Tuple
 
 import torch
@@ -43,14 +42,23 @@ class Decomposition:
         return decomposition
 
     def als(self, target: torch.Tensor) -> None:
-        order = random.sample([0, 1, 2], k=3)
+        orders = [
+            [0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]
+        ]
 
         with torch.no_grad():
             uvw = [self.u, self.v, self.w]
+            order_sequence = torch.randint(0, 6, (self.batch_size,), device=self.device)
+            targets = {(axis1, axis2, axis3): target.permute(axis1, axis2, axis3).reshape(self.elements[axis1], -1) for axis1, axis2, axis3 in orders}
 
-            for i, axis1 in enumerate(order):
-                axis2, axis3 = order[(i + 1) % 3], order[(i + 2) % 3]
-                uvw[axis1] = self.__als_step(uvw[axis2], uvw[axis3], target.permute(axis1, axis2, axis3).reshape(self.elements[axis1], -1))
+            for index, order in enumerate(orders):
+                mask = order_sequence == index
+                if not mask.any():
+                    continue
+
+                for i, axis1 in enumerate(order):
+                    axis2, axis3 = order[(i + 1) % 3], order[(i + 2) % 3]
+                    uvw[axis1][mask] = self.__als_step(uvw[axis2][mask], uvw[axis3][mask], targets[(axis1, axis2, axis3)])
 
             self.u.data = uvw[0]
             self.v.data = uvw[1]
@@ -73,7 +81,8 @@ class Decomposition:
         return torch.round(x * scale) / scale
 
     def __als_step(self, v: torch.Tensor, w: torch.Tensor, T: torch.Tensor, lambda_reg: float = 1e-15) -> torch.Tensor:
-        vw = torch.einsum('bik,bjk->bijk', v, w).reshape(self.batch_size, -1, self.rank)
+        batch_size = v.shape[0]
+        vw = torch.einsum('bik,bjk->bijk', v, w).reshape(batch_size, -1, self.rank)
         a = torch.einsum('bri,brj->bij', vw.conj(), vw)
         b = torch.einsum('ij,bjk->bik', T.to(self.dtype), vw)
         eye = torch.eye(self.rank, dtype=self.dtype, device=self.device).unsqueeze(0)

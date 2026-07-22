@@ -1,5 +1,7 @@
+import hashlib
 import os.path
 import random
+from typing import List
 
 import torch
 
@@ -143,7 +145,7 @@ class DecompositionSolver:
         v_str = "],\n        [".join([", ".join(value2str(value) for value in row) for row in v])
         w_str = "],\n        [".join([", ".join(value2str(value) for value in row) for row in w])
 
-        filename = f"{n}x{m}x{p}_m{rank}_c{complexity}_{ring}.json"
+        filename = f"{n}x{m}x{p}_m{rank}_c{complexity}_{self.__get_uvw_hash(u, v, w)}_{ring}.json"
         with open(os.path.join(self.output_dir, filename), "w") as f:
             f.write("{\n")
             f.write(f'    "dimension": [{n}, {m}, {p}],\n')
@@ -159,3 +161,7 @@ class DecompositionSolver:
 
         if print_verified:
             print(f"Verified {ring} scheme (complexity: {complexity}, values: {values}), total: {self.verified_count()}")
+
+    def __get_uvw_hash(self, u: List[list], v: List[list], w: List[list]) -> str:
+        uvw_rows = ["".join(value2str(value) for value in u[index] + v[index] + w[index]) for index in range(self.decomposition.rank)]
+        return hashlib.sha1("".join(sorted(uvw_rows)).encode()).hexdigest()
