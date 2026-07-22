@@ -6,8 +6,8 @@ import torch
 from src.entities.decomposition import Decomposition
 from src.entities.train_parameters import TrainParameters
 from src.entities.train_strategy import TrainStrategy
-from src.losses import reconstruction_loss, rationalization_loss, sparsity_loss, magnitude_loss, balance_loss
-from src.utils import get_values_ring, value2str, normalize_value
+from src.losses import balance_loss, magnitude_loss, rationalization_loss, reconstruction_loss, sparsity_loss
+from src.utils import get_values_ring, normalize_value, value2str
 
 
 class DecompositionSolver:

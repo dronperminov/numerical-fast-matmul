@@ -24,12 +24,13 @@ class StrategyComparator:
         self.decomposition.initialize()
         self.solvers = [DecompositionSolver(self.decomposition.copy(), strategy, self.T, self.output_dir) for strategy in self.strategies]
         self.runs += 1
+        self.__status(0, 0, steps)
 
         for epoch in range(epoches):
             for step in range(steps):
                 self.__step(step, steps, print_verified=print_verified)
 
-                if step % log_period == 0 or step == steps - 1:
+                if (step + 1) % log_period == 0 or step == steps - 1:
                     self.__status(epoch, step, steps)
 
         for solver in self.solvers:
@@ -41,7 +42,7 @@ class StrategyComparator:
 
     def __status(self, epoch: int, step: int, steps: int) -> None:
         n, m, p = self.decomposition.dimension
-        print(f"\n({n}, {m}, {p}: {self.decomposition.rank}): run: {self.runs}, epoch {epoch + 1}, step {step} / {steps}")
+        print(f"\n({n}, {m}, {p}: {self.decomposition.rank}): run: {self.runs}, epoch {epoch + 1}, step {step + 1} / {steps}")
         print(f'| {"strategy":{self.label_len}} | reconstruction | rounded recons. (mean / min / best) | rationalization | magnitude |   balance   | verified |')
         print(f'+-{"-" * self.label_len}-+----------------+-------------------------------------+-----------------+-----------+-------------+----------+')
 
@@ -58,8 +59,8 @@ class StrategyComparator:
 
         for label, count in sorted(total.items(), key=lambda item: (-item[1], item[0])):
             if count:
-                mean = self.verified_total[label] / (self.runs * self.label2count[label])
-                print(f"{label}: {verified[label]} schemes (total: {count}, mean: {mean:.1f})")
+                mean = f", mean: {self.verified_total[label] / ((self.runs - 1) * self.label2count[label]):.1f}" if self.runs > 1 else ""
+                print(f"{label}: {verified[label]} schemes (total: {count}{mean})")
 
     def __get_verified_count(self) -> Dict[str, int]:
         verified = {label: 0 for label in self.verified_total}
