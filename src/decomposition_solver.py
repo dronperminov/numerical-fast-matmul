@@ -23,16 +23,19 @@ class DecompositionSolver:
         self.best_errors = torch.full((self.batch_size,), float('inf'), dtype=torch.float64, device=self.device)
         self.verified_mask = torch.zeros(self.batch_size, dtype=torch.bool, device=self.device)
 
-    def step(self, step: int, steps: int) -> float:
+    def step(self, step: int, steps: int, print_verified: bool = True) -> float:
         parameters, t = self.strategy.get(step=step, steps=steps)
         loss = self.__train_step(parameters=parameters, t=t)
-        self.__verify()
+        self.__verify(print_verified=print_verified)
 
         if random.random() < parameters.als_probability:
             self.decomposition.als(target=self.T)
-            self.__verify()
+            self.__verify(print_verified=print_verified)
 
         return loss
+
+    def verified_count(self) -> int:
+        return self.verified_mask.sum().item()
 
     def __train_step(self, parameters: TrainParameters, t: float) -> float:
         self.optimizer.zero_grad()
@@ -44,9 +47,9 @@ class DecompositionSolver:
         self.optimizer.step()
         return loss.item() / self.batch_size
 
-    def __verify(self) -> None:
+    def __verify(self, print_verified: bool) -> None:
         for scale in self.strategy.scales:
-            self.__check_rationalized(scale=scale)
+            self.__check_rationalized(scale=scale, print_verified=print_verified)
 
     def status(self) -> None:
         u, v, w = self.decomposition.u, self.decomposition.v, self.decomposition.w
@@ -69,12 +72,9 @@ class DecompositionSolver:
         round_min = reconstruction_round.min().item()
         round_best = self.best_errors.min().item()
 
-        verified = self.verified_mask.sum().item()
+        verified = self.verified_count()
 
-        print("| reconstruction | rounded recons. (mean / min / best) | rationalization | magnitude |   balance   | verified |")
-        print("+----------------+-------------------------------------+-----------------+-----------+-------------+----------+")
         print(f"| {reconstruction:14.6f} | {round_mean:11.5f} | {round_min:9.5f} | {round_best:9.5f} | {rationalization:15.6f} | {magnitude:9.6f} | {balance:11.6f} | {verified:8} |")
-        print("")
 
     def __get_optimizer(self) -> torch.optim.Optimizer:
         if self.strategy.optimizer_name == "adam":
@@ -108,7 +108,7 @@ class DecompositionSolver:
 
         return loss
 
-    def __check_rationalized(self, scale: int, eps: float = 1e-10) -> None:
+    def __check_rationalized(self, scale: int, print_verified: bool, eps: float = 1e-10) -> None:
         u, v, w = self.decomposition.get_rounded(scale=scale)
         errors = reconstruction_loss(target=self.T, u=u, v=v, w=w).to(self.best_errors.dtype)
 
@@ -124,9 +124,9 @@ class DecompositionSolver:
             return
 
         for index in verify_mask.nonzero(as_tuple=True)[0]:
-            self.__save_verified(u[index], v[index], w[index])
+            self.__save_verified(u[index], v[index], w[index], print_verified=print_verified)
 
-    def __save_verified(self, u: torch.Tensor, v: torch.Tensor, w: torch.Tensor) -> None:
+    def __save_verified(self, u: torch.Tensor, v: torch.Tensor, w: torch.Tensor, print_verified: bool) -> None:
         n, m, p = self.decomposition.dimension
         elements = self.decomposition.elements
         rank = self.decomposition.rank
@@ -150,9 +150,12 @@ class DecompositionSolver:
             f.write(f'    "rank": {rank},\n')
             f.write(f'    "complexity": {complexity},\n')
             f.write(f'    "ring": "{ring}",\n')
+            if self.strategy.label:
+                f.write(f'    "strategy": "{self.strategy.label}",\n')
             f.write(f'    "u": [\n        [{u_str}]\n    ],\n')
             f.write(f'    "v": [\n        [{v_str}]\n    ],\n')
             f.write(f'    "w": [\n        [{w_str}]\n    ]\n')
             f.write("}\n")
 
-        print(f"Verified {ring} scheme (complexity: {complexity}, values: {values}), total: {self.verified_mask.sum().item()}")
+        if print_verified:
+            print(f"Verified {ring} scheme (complexity: {complexity}, values: {values}), total: {self.verified_count()}")

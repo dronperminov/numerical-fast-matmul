@@ -28,6 +28,20 @@ class Decomposition:
         self.v.requires_grad_(True)
         self.w.requires_grad_(True)
 
+    def copy(self) -> Decomposition:
+        n, m, p = self.dimension
+        decomposition = Decomposition(n=n, m=m, p=p, rank=self.rank, dtype=self.dtype, batch_size=self.batch_size, device=self.device)
+
+        with torch.no_grad():
+            decomposition.u.data = self.u.clone()
+            decomposition.v.data = self.v.clone()
+            decomposition.w.data = self.w.clone()
+
+        decomposition.u.requires_grad_(True)
+        decomposition.v.requires_grad_(True)
+        decomposition.w.requires_grad_(True)
+        return decomposition
+
     def als(self, target: torch.Tensor) -> None:
         order = random.sample([0, 1, 2], k=3)
 

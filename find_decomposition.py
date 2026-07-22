@@ -10,10 +10,10 @@ from src.utils import get_matmul_tensor, get_dtype
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-n", help="n", type=int, default=2)
-    parser.add_argument("-m", help="m", type=int, default=4)
-    parser.add_argument("-p", help="p", type=int, default=5)
-    parser.add_argument("--rank", help="decomposition rank", type=int, default=32)
+    parser.add_argument("-n", help="n", type=int, default=3)
+    parser.add_argument("-m", help="m", type=int, default=3)
+    parser.add_argument("-p", help="p", type=int, default=3)
+    parser.add_argument("--rank", help="decomposition rank", type=int, default=23)
     parser.add_argument("--data-type", help="coefficients type", choices=["complex64", "complex128", "float32", "float64"], default="float32")
     parser.add_argument("--batch-size", help="batch size", type=int, default=2048)
     parser.add_argument("--device", help="torch device", type=str, default="cuda")
@@ -53,10 +53,12 @@ def main():
 
     for epoch in range(args.epoches):
         for step in range(args.steps):
-            loss = solver.step(step, args.steps)
+            loss = solver.step(step, args.steps, print_verified=False)
 
             if step % args.log_period == 0:
-                print(f"({args.n}, {args.m}, {args.p}: {args.rank}): epoch {epoch + 1}, step {step} / {args.steps}, loss: {loss}")
+                print(f"\n({args.n}, {args.m}, {args.p}: {args.rank}): epoch {epoch + 1}, step {step} / {args.steps}, loss: {loss}")
+                print("| reconstruction | rounded recons. (mean / min / best) | rationalization | magnitude |   balance   | verified |")
+                print("+----------------+-------------------------------------+-----------------+-----------+-------------+----------+")
                 solver.status()
 
 
