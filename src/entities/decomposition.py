@@ -13,32 +13,25 @@ class Decomposition:
         self.batch_size = batch_size
         self.device = device
 
-        self.u = torch.zeros(self.batch_size, self.elements[0], self.rank, device=self.device, dtype=self.dtype)
-        self.v = torch.zeros(self.batch_size, self.elements[1], self.rank, device=self.device, dtype=self.dtype)
-        self.w = torch.zeros(self.batch_size, self.elements[2], self.rank, device=self.device, dtype=self.dtype)
+        self.u = torch.zeros(self.batch_size, self.elements[0], self.rank, device=self.device, dtype=self.dtype, requires_grad=True)
+        self.v = torch.zeros(self.batch_size, self.elements[1], self.rank, device=self.device, dtype=self.dtype, requires_grad=True)
+        self.w = torch.zeros(self.batch_size, self.elements[2], self.rank, device=self.device, dtype=self.dtype, requires_grad=True)
 
-    def initialize(self, scale: float = 0.01) -> None:
+    def initialize(self, scale: float = 0.5) -> None:
         with torch.no_grad():
-            self.u.data = torch.randn_like(self.u) * scale
-            self.v.data = torch.randn_like(self.v) * scale
-            self.w.data = torch.randn_like(self.w) * scale
-
-        self.u.requires_grad_(True)
-        self.v.requires_grad_(True)
-        self.w.requires_grad_(True)
+            self.u.normal_(mean=0, std=scale)
+            self.v.normal_(mean=0, std=scale)
+            self.w.normal_(mean=0, std=scale)
 
     def copy(self) -> "Decomposition":
         n, m, p = self.dimension
         decomposition = Decomposition(n=n, m=m, p=p, rank=self.rank, dtype=self.dtype, batch_size=self.batch_size, device=self.device)
 
         with torch.no_grad():
-            decomposition.u.data = self.u.clone()
-            decomposition.v.data = self.v.clone()
-            decomposition.w.data = self.w.clone()
+            decomposition.u.copy_(self.u)
+            decomposition.v.copy_(self.v)
+            decomposition.w.copy_(self.w)
 
-        decomposition.u.requires_grad_(True)
-        decomposition.v.requires_grad_(True)
-        decomposition.w.requires_grad_(True)
         return decomposition
 
     def als(self, target: torch.Tensor) -> None:
@@ -47,7 +40,7 @@ class Decomposition:
         ]
 
         with torch.no_grad():
-            uvw = [self.u, self.v, self.w]
+            uvw = [self.u.clone(), self.v.clone(), self.w.clone()]
             order_sequence = torch.randint(0, 6, (self.batch_size,), device=self.device)
             targets = {(axis1, axis2, axis3): target.permute(axis1, axis2, axis3).reshape(self.elements[axis1], -1) for axis1, axis2, axis3 in orders}
 
@@ -60,9 +53,15 @@ class Decomposition:
                     axis2, axis3 = order[(i + 1) % 3], order[(i + 2) % 3]
                     uvw[axis1][mask] = self.__als_step(uvw[axis2][mask], uvw[axis3][mask], targets[(axis1, axis2, axis3)])
 
-            self.u.data = uvw[0]
-            self.v.data = uvw[1]
-            self.w.data = uvw[2]
+            self.u.copy_(uvw[0])
+            self.v.copy_(uvw[1])
+            self.w.copy_(uvw[2])
+
+    def project_to_rounded(self, scale: int, alpha: float):
+        with torch.no_grad():
+            self.u.copy_(self.__project_round(self.u, scale=scale, alpha=alpha))
+            self.v.copy_(self.__project_round(self.v, scale=scale, alpha=alpha))
+            self.w.copy_(self.__project_round(self.w, scale=scale, alpha=alpha))
 
     def get_rounded(self, scale: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         with torch.no_grad():
@@ -79,6 +78,9 @@ class Decomposition:
             return torch.view_as_complex(x)
 
         return torch.round(x * scale) / scale
+
+    def __project_round(self, x: torch.Tensor, scale: int, alpha: float)-> torch.Tensor:
+        return (1 - alpha) * x + alpha * torch.round(x * scale) / scale
 
     def __als_step(self, v: torch.Tensor, w: torch.Tensor, T: torch.Tensor, lambda_reg: float = 1e-15) -> torch.Tensor:
         batch_size = v.shape[0]

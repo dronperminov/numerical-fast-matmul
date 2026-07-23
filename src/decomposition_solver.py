@@ -30,11 +30,45 @@ class DecompositionSolver:
         loss = self.__train_step(parameters=parameters, t=t)
         self.__verify(print_verified=print_verified)
 
+        if parameters.project_alpha(t):
+            self.decomposition.project_to_rounded(scale=max(self.strategy.scales), alpha=parameters.project_alpha(t))
+            self.__verify(print_verified=print_verified)
+
         if random.random() < parameters.als_probability:
             self.decomposition.als(target=self.T)
             self.__verify(print_verified=print_verified)
 
+        if parameters.project_alpha(t):
+            self.decomposition.project_to_rounded(scale=max(self.strategy.scales), alpha=parameters.project_alpha(t))
+            self.__verify(print_verified=print_verified)
+
         return loss
+
+    def status(self) -> None:
+        with torch.no_grad():
+            u, v, w = self.decomposition.u, self.decomposition.v, self.decomposition.w
+            uvw_abs = torch.cat([torch.view_as_real(t) if torch.is_complex(t) else t for t in [u, v, w]], dim=1).abs()
+            mask = uvw_abs > 0
+
+            reconstruction = reconstruction_loss(target=self.T, u=u, v=v, w=w).mean().item()
+            rationalization = torch.abs(uvw_abs[mask] - torch.round(uvw_abs[mask] * 2) / 2).mean().item()
+            magnitude = uvw_abs[mask].mean().item()
+            balance = balance_loss(u=u, v=v, w=w).mean().item()
+
+        reconstruction_rounds = []
+        for scale in self.strategy.scales:
+            ur, vr, wr = self.decomposition.get_rounded(scale=scale)
+            reconstruction_round = reconstruction_loss(target=self.T, u=ur, v=vr, w=wr)
+            reconstruction_rounds.append(reconstruction_round)
+
+        reconstruction_round = torch.stack(reconstruction_rounds, dim=1).min(dim=1)[0]
+        round_mean = reconstruction_round.mean().item()
+        round_min = reconstruction_round.min().item()
+        round_best = self.best_errors.min().item()
+
+        verified = self.verified_count()
+
+        print(f"| {reconstruction:14.6f} | {round_mean:11.5f} | {round_min:9.5f} | {round_best:9.5f} | {rationalization:15.6f} | {magnitude:9.6f} | {balance:11.6f} | {verified:8} |")
 
     def verified_count(self) -> int:
         return self.verified_mask.sum().item()
@@ -52,31 +86,6 @@ class DecompositionSolver:
     def __verify(self, print_verified: bool) -> None:
         for scale in self.strategy.scales:
             self.__check_rationalized(scale=scale, print_verified=print_verified)
-
-    def status(self) -> None:
-        u, v, w = self.decomposition.u, self.decomposition.v, self.decomposition.w
-        uvw_abs = torch.cat([torch.view_as_real(t) if torch.is_complex(t) else t for t in [u, v, w]], dim=1).abs()
-        mask = uvw_abs > 0
-
-        reconstruction = reconstruction_loss(target=self.T, u=u, v=v, w=w).mean().item()
-        rationalization = torch.abs(uvw_abs[mask] - torch.round(uvw_abs[mask] * 2) / 2).mean().item()
-        magnitude = uvw_abs[mask].mean().item()
-        balance = balance_loss(u=u, v=v, w=w).mean().item()
-
-        reconstruction_rounds = []
-        for scale in self.strategy.scales:
-            ur, vr, wr = self.decomposition.get_rounded(scale=scale)
-            reconstruction_round = reconstruction_loss(target=self.T, u=ur, v=vr, w=wr)
-            reconstruction_rounds.append(reconstruction_round)
-
-        reconstruction_round = torch.stack(reconstruction_rounds, dim=1).min(dim=1)[0]
-        round_mean = reconstruction_round.mean().item()
-        round_min = reconstruction_round.min().item()
-        round_best = self.best_errors.min().item()
-
-        verified = self.verified_count()
-
-        print(f"| {reconstruction:14.6f} | {round_mean:11.5f} | {round_min:9.5f} | {round_best:9.5f} | {rationalization:15.6f} | {magnitude:9.6f} | {balance:11.6f} | {verified:8} |")
 
     def __get_optimizer(self) -> torch.optim.Optimizer:
         if self.strategy.optimizer_name == "adam":

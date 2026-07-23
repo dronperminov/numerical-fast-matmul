@@ -6,14 +6,15 @@ from typing import Callable
 @dataclass
 class TrainParameters:
     end_part: float
-    w_rationalization: Callable[[float], float]
-    w_sparsity: Callable[[float], float]
-    w_magnitude: Callable[[float], float]
-    w_balance: Callable[[float], float]
+    w_rationalization: Callable[[float], float] = lambda t: 0.0
+    w_sparsity: Callable[[float], float] = lambda t: 0.0
+    w_magnitude: Callable[[float], float] = lambda t: 0.0
+    w_balance: Callable[[float], float] = lambda t: 0.0
     rationalization_type: str = "ternary"
     sparsity_type: str = "sqrt"
     max_abs_value: float = 3.0
     als_probability: float = 0.0
+    project_alpha: Callable[[float], float] = lambda t: 0.0
 
     @staticmethod
     def default() -> "TrainParameters":
