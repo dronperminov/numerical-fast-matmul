@@ -1,3 +1,4 @@
+import math
 from typing import List, Tuple
 
 from src.entities.train_parameters import TrainParameters
@@ -27,3 +28,21 @@ class TrainStrategy:
             start_step = end_step
 
         return self.default_parameters, step / steps
+
+    @staticmethod
+    def default(learning_rate: float = 0.1) -> "TrainStrategy":
+        balance = TrainParameters(
+            end_part=0.4,
+            w_rationalization=lambda t: 0,
+            w_sparsity=lambda t: 0,
+            w_magnitude=lambda t: 0.1 * t,
+            w_balance=lambda t: 0.05,
+            max_abs_value=3.0,
+            als_probability=0.75,
+            project_alpha=lambda t: 0.01
+        )
+
+        strategy = TrainStrategy(label="default", scales=[1, 2], learning_rate=learning_rate, optimizer_name="adam")
+        strategy.add(balance)
+        strategy.add(TrainParameters.default())
+        return strategy

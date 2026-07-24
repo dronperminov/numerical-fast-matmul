@@ -88,3 +88,20 @@ def get_values_ring(values: Set[Union[int, float, complex]]) -> str:
         return "Z"
 
     return "ZT"
+
+
+def pretty_time(seconds: float) -> str:
+    if seconds < 60:
+        return f"{seconds:.2f} sec"
+
+    seconds = round(seconds)
+
+    if seconds < 3600:
+        minutes = seconds // 60
+        seconds = seconds % 60
+        return f"{minutes} min {seconds} sec"
+
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    seconds = seconds % 60
+    return f"{hours} hours {minutes} mins {seconds} sec"

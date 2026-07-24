@@ -1,3 +1,4 @@
+import time
 from typing import Dict, List
 
 import torch
@@ -5,6 +6,7 @@ import torch
 from src.decomposition_solver import DecompositionSolver
 from src.entities.decomposition import Decomposition
 from src.entities.train_strategy import TrainStrategy
+from src.utils import pretty_time
 
 
 class StrategyComparator:
@@ -20,18 +22,21 @@ class StrategyComparator:
         self.label2count = self.__get_labels_count()
         self.runs = 0
 
-    def run(self, epoches: int, steps: int, log_period: int, print_verified: bool) -> None:
+    def run(self, epochs: int, steps: int, log_period: int, print_verified: bool) -> None:
         self.decomposition.initialize()
         self.solvers = [DecompositionSolver(self.decomposition.copy(), strategy, self.T, self.output_dir) for strategy in self.strategies]
         self.runs += 1
-        self.__status(0, 0, steps)
+        self.__status(0, -1, steps)
+        start_time = time.time()
 
-        for epoch in range(epoches):
+        for epoch in range(epochs):
             for step in range(steps):
                 self.__step(step, steps, print_verified=print_verified)
 
                 if (step + 1) % log_period == 0 or step == steps - 1:
-                    self.__status(epoch, step, steps)
+                    end_time = time.time()
+                    self.__status(epoch, step, steps, elapsed=end_time - start_time)
+                    start_time = end_time
 
         for solver in self.solvers:
             self.verified_total[solver.strategy.label] += solver.verified_count()
@@ -40,9 +45,9 @@ class StrategyComparator:
         for solver in self.solvers:
             solver.step(step=step, steps=steps, print_verified=print_verified)
 
-    def __status(self, epoch: int, step: int, steps: int) -> None:
+    def __status(self, epoch: int, step: int, steps: int, elapsed: float = 0.0) -> None:
         n, m, p = self.decomposition.dimension
-        print(f"\n({n}, {m}, {p}: {self.decomposition.rank}): run: {self.runs}, epoch {epoch + 1}, step {step + 1} / {steps}")
+        print(f"\n({n}, {m}, {p}: {self.decomposition.rank}): run: {self.runs}, epoch {epoch + 1}, step {step + 1} / {steps}, elapsed: {pretty_time(elapsed)}")
         print(f'| {"strategy":{self.label_len}} | reconstruction | rounded recons. (mean / min / best) | rationalization | magnitude |   balance   | verified |')
         print(f'+-{"-" * self.label_len}-+----------------+-------------------------------------+-----------------+-----------+-------------+----------+')
 
