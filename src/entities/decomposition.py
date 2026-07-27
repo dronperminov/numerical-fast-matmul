@@ -34,6 +34,9 @@ class Decomposition:
 
         return decomposition
 
+    def get_coefficients_count(self) -> int:
+        return self.rank * sum(self.elements)
+
     def als(self, target: torch.Tensor) -> None:
         orders = [
             [0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]
@@ -80,6 +83,11 @@ class Decomposition:
         return torch.round(x * scale) / scale
 
     def __project_round(self, x: torch.Tensor, scale: int, alpha: float)-> torch.Tensor:
+        if torch.is_complex(x):
+            x = torch.view_as_real(x)
+            x = (1 - alpha) * x + alpha * torch.round(x * scale) / scale
+            return torch.view_as_complex(x)
+
         return (1 - alpha) * x + alpha * torch.round(x * scale) / scale
 
     def __als_step(self, v: torch.Tensor, w: torch.Tensor, T: torch.Tensor, lambda_reg: float = 1e-15) -> torch.Tensor:
