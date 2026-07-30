@@ -5,7 +5,7 @@ import torch
 
 def reconstruction_loss(target: torch.Tensor, u: torch.Tensor, v: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
     reconstructed = torch.einsum("bir,bjr,bkr->bijk", u, v, w)
-    residual = target.to(u.dtype).unsqueeze(0).expand_as(reconstructed) - reconstructed
+    residual = target.unsqueeze(0).expand_as(reconstructed) - reconstructed
     loss = torch.real(residual * residual.conj()) if torch.is_complex(u) else residual ** 2
     return loss.flatten(start_dim=1).sum(dim=1)
 

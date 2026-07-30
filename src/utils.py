@@ -14,8 +14,8 @@ def get_dtype(data_type: str) -> torch.dtype:
     return data_type2dtype[data_type]
 
 
-def get_matmul_tensor(n: int, m: int, p: int, device: str) -> torch.Tensor:
-    tensor = torch.zeros((n * m, m * p, p * n), dtype=torch.float64, device=device)
+def get_matmul_tensor(n: int, m: int, p: int, device: str, dtype: torch.dtype) -> torch.Tensor:
+    tensor = torch.zeros((n * m, m * p, p * n), dtype=dtype, device=device)
 
     for i in range(n):
         for j in range(p):

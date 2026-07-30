@@ -4,7 +4,7 @@ import os.path
 from src.decomposition_solver import DecompositionSolver
 from src.entities.decomposition import Decomposition
 from src.entities.train_strategy import TrainStrategy
-from src.utils import get_matmul_tensor, get_dtype
+from src.utils import get_dtype, get_matmul_tensor
 
 
 def main():
@@ -13,7 +13,7 @@ def main():
     parser.add_argument("-m", help="Dimension m", type=int, default=3)
     parser.add_argument("-p", help="Dimension p", type=int, default=3)
     parser.add_argument("--rank", help="Decomposition rank", type=int, default=23)
-    parser.add_argument("--data-type", help="Coefficients data type", choices=["complex64", "complex128", "float32", "float64"], default="float32")
+    parser.add_argument("--data-type", help="Coefficients data type", choices=["complex64", "complex128", "float32", "float64"], default="float64")
     parser.add_argument("--batch-size", help="Batch size", type=int, default=2048)
     parser.add_argument("--device", help="Torch device", type=str, default="cuda")
     parser.add_argument("--learning-rate", help="Learning rate", type=float, default=0.1)
@@ -41,8 +41,8 @@ def main():
     strategy = TrainStrategy.default(learning_rate=args.learning_rate)
 
     dimension = f"({args.n}, {args.m}, {args.p}: {args.rank})"
-    target_tensor = get_matmul_tensor(n=args.n, m=args.m, p=args.p, device=args.device)
     dtype = get_dtype(args.data_type)
+    target_tensor = get_matmul_tensor(n=args.n, m=args.m, p=args.p, device=args.device, dtype=dtype)
 
     for restart in range(args.restarts):
         decomposition = Decomposition(n=args.n, m=args.m, p=args.p, rank=args.rank, dtype=dtype, batch_size=args.batch_size, device=args.device)

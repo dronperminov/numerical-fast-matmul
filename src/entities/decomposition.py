@@ -94,7 +94,7 @@ class Decomposition:
         batch_size = v.shape[0]
         vw = torch.einsum('bik,bjk->bijk', v, w).reshape(batch_size, -1, self.rank)
         a = torch.einsum('bri,brj->bij', vw.conj(), vw)
-        b = torch.einsum('ij,bjk->bik', T.to(self.dtype), vw)
+        b = torch.einsum('ij,bjk->bik', T, vw)
         eye = torch.eye(self.rank, dtype=self.dtype, device=self.device).unsqueeze(0)
         u = torch.linalg.solve(a + lambda_reg * eye, b.permute(0, 2, 1).conj())
         return u.permute(0, 2, 1)

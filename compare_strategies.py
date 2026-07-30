@@ -7,7 +7,7 @@ from src.entities.decomposition import Decomposition
 from src.entities.train_parameters import TrainParameters
 from src.entities.train_strategy import TrainStrategy
 from src.strategy_comparator import StrategyComparator
-from src.utils import get_matmul_tensor, get_dtype
+from src.utils import get_dtype, get_matmul_tensor
 
 
 def init_strategies(learning_rate: float, repeats: int = 2) -> List[TrainStrategy]:
@@ -104,7 +104,7 @@ def main():
     decomposition = Decomposition(n=args.n, m=args.m, p=args.p, rank=args.rank, dtype=dtype, batch_size=args.batch_size, device=args.device)
 
     strategies = init_strategies(learning_rate=args.learning_rate)
-    target_tensor = get_matmul_tensor(n=args.n, m=args.m, p=args.p, device=args.device)
+    target_tensor = get_matmul_tensor(n=args.n, m=args.m, p=args.p, device=args.device, dtype=dtype)
 
     comparator = StrategyComparator(decomposition=decomposition, strategies=strategies, T=target_tensor, output_dir=output_dir)
 

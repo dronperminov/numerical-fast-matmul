@@ -1,4 +1,3 @@
-import math
 from typing import List, Tuple
 
 from src.entities.train_parameters import TrainParameters
