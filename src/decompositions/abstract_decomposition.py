@@ -1,10 +1,11 @@
-from typing import Tuple
+from abc import abstractmethod, ABC
+from typing import List, Tuple
 
 import torch
 
 
-class Decomposition:
-    def __init__(self, n: int, m: int, p: int, rank: int, dtype: torch.dtype, batch_size: int, device: str):
+class AbstractDecomposition(ABC):
+    def __init__(self, n: int, m: int, p: int, rank: int, dtype: torch.dtype, batch_size: int, device: str) -> None:
         self.dimension = [n, m, p]
         self.elements = [n * m, m * p, p * n]
         self.rank = rank
@@ -13,37 +14,45 @@ class Decomposition:
         self.batch_size = batch_size
         self.device = device
 
-        self.u = torch.zeros(self.batch_size, self.elements[0], self.rank, device=self.device, dtype=self.dtype, requires_grad=True)
-        self.v = torch.zeros(self.batch_size, self.elements[1], self.rank, device=self.device, dtype=self.dtype, requires_grad=True)
-        self.w = torch.zeros(self.batch_size, self.elements[2], self.rank, device=self.device, dtype=self.dtype, requires_grad=True)
-
-    def initialize(self, scale: float = 0.5) -> None:
-        with torch.no_grad():
-            self.u.normal_(mean=0, std=scale)
-            self.v.normal_(mean=0, std=scale)
-            self.w.normal_(mean=0, std=scale)
-
-    def copy(self) -> "Decomposition":
-        n, m, p = self.dimension
-        decomposition = Decomposition(n=n, m=m, p=p, rank=self.rank, dtype=self.dtype, batch_size=self.batch_size, device=self.device)
-
-        with torch.no_grad():
-            decomposition.u.copy_(self.u)
-            decomposition.v.copy_(self.v)
-            decomposition.w.copy_(self.w)
-
-        return decomposition
-
     def get_coefficients_count(self) -> int:
         return self.rank * sum(self.elements)
 
+    @abstractmethod
+    def get_parameters(self) -> List[torch.Tensor]:
+        pass
+
+    @abstractmethod
+    def get_coefficients(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        pass
+
+    @abstractmethod
+    def get_rounded(self, scale: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        pass
+
+    @abstractmethod
+    def initialize(self, scale: float = 0.5) -> None:
+        pass
+
+    @abstractmethod
+    def copy(self) -> "AbstractDecomposition":
+        pass
+
+    @abstractmethod
     def als(self, target: torch.Tensor) -> None:
+        pass
+
+    def project_to_rounded(self, scale: int, alpha: float):
+        with torch.no_grad():
+            for matrix in self.get_parameters():
+                matrix.copy_(self.__project_round(matrix, scale=scale, alpha=alpha))
+
+    def _als(self, target: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         orders = [
             [0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]
         ]
 
         with torch.no_grad():
-            uvw = [self.u.clone(), self.v.clone(), self.w.clone()]
+            uvw = [matrix.clone() for matrix in self.get_coefficients()]
             order_sequence = torch.randint(0, 6, (self.batch_size,), device=self.device)
             targets = {(axis1, axis2, axis3): target.permute(axis1, axis2, axis3).reshape(self.elements[axis1], -1) for axis1, axis2, axis3 in orders}
 
@@ -56,25 +65,9 @@ class Decomposition:
                     axis2, axis3 = order[(i + 1) % 3], order[(i + 2) % 3]
                     uvw[axis1][mask] = self.__als_step(uvw[axis2][mask], uvw[axis3][mask], targets[(axis1, axis2, axis3)])
 
-            self.u.copy_(uvw[0])
-            self.v.copy_(uvw[1])
-            self.w.copy_(uvw[2])
+        return uvw[0], uvw[1], uvw[2]
 
-    def project_to_rounded(self, scale: int, alpha: float):
-        with torch.no_grad():
-            self.u.copy_(self.__project_round(self.u, scale=scale, alpha=alpha))
-            self.v.copy_(self.__project_round(self.v, scale=scale, alpha=alpha))
-            self.w.copy_(self.__project_round(self.w, scale=scale, alpha=alpha))
-
-    def get_rounded(self, scale: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        with torch.no_grad():
-            u = self.__round(self.u, scale=scale)
-            v = self.__round(self.v, scale=scale)
-            w = self.__round(self.w, scale=scale)
-
-        return u, v, w
-
-    def __round(self, x: torch.Tensor, scale: int) -> torch.Tensor:
+    def _round(self, x: torch.Tensor, scale: int) -> torch.Tensor:
         if torch.is_complex(x):
             x = torch.view_as_real(x)
             x = torch.round(x * scale) / scale

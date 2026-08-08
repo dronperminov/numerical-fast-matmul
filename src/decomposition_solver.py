@@ -5,7 +5,7 @@ from typing import List
 
 import torch
 
-from src.entities.decomposition import Decomposition
+from src.decompositions import AbstractDecomposition
 from src.entities.train_parameters import TrainParameters
 from src.entities.train_strategy import TrainStrategy
 from src.losses import balance_loss, magnitude_loss, rationalization_loss, reconstruction_loss, sparsity_loss
@@ -13,7 +13,7 @@ from src.utils import get_values_ring, normalize_value, value2str
 
 
 class DecompositionSolver:
-    def __init__(self, decomposition: Decomposition, strategy: TrainStrategy, T: torch.Tensor, output_dir: str) -> None:
+    def __init__(self, decomposition: AbstractDecomposition, strategy: TrainStrategy, T: torch.Tensor, output_dir: str) -> None:
         self.decomposition = decomposition
         self.strategy = strategy
         self.T = T
@@ -46,7 +46,7 @@ class DecompositionSolver:
 
     def status(self) -> None:
         with torch.no_grad():
-            u, v, w = self.decomposition.u, self.decomposition.v, self.decomposition.w
+            u, v, w = self.decomposition.get_coefficients()
             uvw_abs = torch.cat([torch.view_as_real(t) if torch.is_complex(t) else t for t in [u, v, w]], dim=1).abs()
             mask = uvw_abs > 0
 
@@ -79,7 +79,7 @@ class DecompositionSolver:
         loss = loss.sum()
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm_([self.decomposition.u, self.decomposition.v, self.decomposition.w], max_norm=5.0)
+        torch.nn.utils.clip_grad_norm_(self.decomposition.get_parameters(), max_norm=5.0)
         self.optimizer.step()
         return loss.item() / self.batch_size
 
@@ -89,10 +89,10 @@ class DecompositionSolver:
 
     def __get_optimizer(self) -> torch.optim.Optimizer:
         if self.strategy.optimizer_name == "adam":
-            return torch.optim.Adam([self.decomposition.u, self.decomposition.v, self.decomposition.w], lr=self.strategy.learning_rate)
+            return torch.optim.Adam(self.decomposition.get_parameters(), lr=self.strategy.learning_rate)
 
         if self.strategy.optimizer_name == "adamw":
-            return torch.optim.AdamW([self.decomposition.u, self.decomposition.v, self.decomposition.w], lr=self.strategy.learning_rate)
+            return torch.optim.AdamW(self.decomposition.get_parameters(), lr=self.strategy.learning_rate)
 
         raise ValueError(f'Unknown optimizer "{self.strategy.optimizer_name}"')
 
@@ -102,7 +102,7 @@ class DecompositionSolver:
         w_magnitude = parameters.w_magnitude(t)
         w_balance = parameters.w_balance(t)
 
-        u, v, w = self.decomposition.u, self.decomposition.v, self.decomposition.w
+        u, v, w = self.decomposition.get_coefficients()
         loss = reconstruction_loss(target=self.T, u=u, v=v, w=w)
 
         if w_rationalization:

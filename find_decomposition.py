@@ -2,7 +2,7 @@ import argparse
 import os.path
 
 from src.decomposition_solver import DecompositionSolver
-from src.entities.decomposition import Decomposition
+from src.decompositions import CyclicDecomposition, Decomposition
 from src.entities.train_strategy import TrainStrategy
 from src.utils import get_dtype, get_matmul_tensor
 
@@ -13,6 +13,8 @@ def main():
     parser.add_argument("-m", help="Dimension m", type=int, default=3)
     parser.add_argument("-p", help="Dimension p", type=int, default=3)
     parser.add_argument("--rank", help="Decomposition rank", type=int, default=23)
+    parser.add_argument("-s", help="Number of symmetric components (only when n=m=p)", type=int, default=0)
+    parser.add_argument("-t", help="Number of cyclic triplets (only when n=m=p)", type=int, default=0)
     parser.add_argument("--data-type", help="Coefficients data type", choices=["complex64", "complex128", "float32", "float64"], default="float64")
     parser.add_argument("--batch-size", help="Batch size", type=int, default=2048)
     parser.add_argument("--device", help="Torch device", type=str, default="cuda")
@@ -24,10 +26,23 @@ def main():
     parser.add_argument("-o", "--output-dir", help="Directory to save discovered decompositions", type=str, default="discovered_decompositions")
     args = parser.parse_args()
 
+    use_cyclic = args.s > 0 or args.t > 0
+    if use_cyclic:
+        if not (args.n == args.m == args.p):
+            parser.error("Cyclic symmetry parameters -s and -t require n=m=p (cubic tensors only)")
+
+        rank = args.s + 3 * args.t
+        if args.rank != rank:
+            parser.error(f"Rank mismatch: --rank={args.rank}, but s + 3*t = {args.s} + 3*{args.t} = {rank}. With cyclic symmetry, rank must equal s + 3*t.")
+
     output_dir = os.path.join(args.output_dir, f"{args.n}x{args.m}x{args.p}", f"rank{args.rank}")
     os.makedirs(output_dir, exist_ok=True)
 
     print(f"Starting fast matmul decomposition search for {args.n}x{args.m}x{args.p} with rank {args.rank} using the default strategy")
+    if use_cyclic:
+        print(f"- decomposition type: cyclic symmetric (s = {args.s}, t = {args.t})")
+    else:
+        print(f"- decomposition type: usual")
     print(f"- data type: {args.data_type}")
     print(f"- batch size: {args.batch_size}")
     print(f"- device: {args.device}")
@@ -45,7 +60,11 @@ def main():
     target_tensor = get_matmul_tensor(n=args.n, m=args.m, p=args.p, device=args.device, dtype=dtype)
 
     for restart in range(args.restarts):
-        decomposition = Decomposition(n=args.n, m=args.m, p=args.p, rank=args.rank, dtype=dtype, batch_size=args.batch_size, device=args.device)
+        if use_cyclic:
+            decomposition = CyclicDecomposition(n=args.n, s=args.s, t=args.t, rank=args.rank, dtype=dtype, batch_size=args.batch_size, device=args.device)
+        else:
+            decomposition = Decomposition(n=args.n, m=args.m, p=args.p, rank=args.rank, dtype=dtype, batch_size=args.batch_size, device=args.device)
+
         decomposition.initialize(scale=0.25)
         solver = DecompositionSolver(decomposition=decomposition, strategy=strategy, T=target_tensor, output_dir=output_dir)
 

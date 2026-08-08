@@ -3,7 +3,7 @@ import math
 import os.path
 from typing import List
 
-from src.entities.decomposition import Decomposition
+from src.decompositions import CyclicDecomposition, Decomposition
 from src.entities.train_parameters import TrainParameters
 from src.entities.train_strategy import TrainStrategy
 from src.strategy_comparator import StrategyComparator
@@ -28,45 +28,50 @@ def init_strategies(learning_rate: float, repeats: int = 2) -> List[TrainStrateg
     ]
 
     project_weights = [
-        ("0.010", lambda t: 0.010),
+        ("0", lambda t: 0.0),
+        ("0.01", lambda t: 0.01),
         ("0.05t", lambda t: 0.05 * t),
     ]
 
-    als_probabilities = [0.5, 0.75]
+    als_probabilities = [0.0, 0.25, 0.5, 0.75]
+    max_abs_values = [2.0]
+    end_parts = [0.4]
 
     for rat_name, rationalization_weight in rationalization_weights:
         for als_probability in als_probabilities:
             for project_name, project_weight in project_weights:
                 for sparsity_name, sparsity_weight in sparsity_weights:
-                    balance = TrainParameters(
-                        end_part=0.4,
-                        w_rationalization=lambda t: 0,
-                        w_sparsity=lambda t: 0,
-                        w_magnitude=lambda t: 0.1 * t,
-                        w_balance=lambda t: 0.01,
-                        max_abs_value=2.0,
-                        als_probability=als_probability,
-                        project_alpha=project_weight
-                    )
+                    for max_abs_value in max_abs_values:
+                        for end_part in end_parts:
+                            balance = TrainParameters(
+                                end_part=end_part,
+                                w_rationalization=lambda t: 0,
+                                w_sparsity=lambda t: 0,
+                                w_magnitude=lambda t: 0.0,
+                                w_balance=lambda t: 0.01,
+                                max_abs_value=max_abs_value,
+                                als_probability=als_probability,
+                                project_alpha=project_weight
+                            )
 
-                    rationalization = TrainParameters(
-                        end_part=1.0,
-                        w_rationalization=rationalization_weight,
-                        w_sparsity=sparsity_weight,
-                        w_magnitude=lambda t: 0.1 * t,
-                        w_balance=lambda t: 0.001,
-                        rationalization_type="ternary",
-                        sparsity_type="sqrt",
-                        max_abs_value=2.0,
-                        als_probability=als_probability,
-                        project_alpha=project_weight
-                    )
+                            rationalization = TrainParameters(
+                                end_part=1.0,
+                                w_rationalization=rationalization_weight,
+                                w_sparsity=sparsity_weight,
+                                w_magnitude=lambda t: 0.1 * t,
+                                w_balance=lambda t: 0.01,
+                                rationalization_type="ternary",
+                                sparsity_type="sqrt",
+                                max_abs_value=max_abs_value,
+                                als_probability=als_probability,
+                                project_alpha=project_weight
+                            )
 
-                    label = f"[ALS{als_probability:.2f}]-[P{project_name}]-[S{sparsity_name}]-[R{rat_name}]"
-                    strategy = TrainStrategy(label=label, scales=[1, 2], learning_rate=learning_rate)
-                    strategy.add(balance)
-                    strategy.add(rationalization)
-                    strategies.append(strategy)
+                            label = f"[ALS{als_probability:.2f}]-[E{end_part}]-[|{max_abs_value}|]-[P{project_name}]-[S{sparsity_name}]-[R{rat_name}]-[lr{learning_rate}]"
+                            strategy = TrainStrategy(label=label, scales=[1, 2], learning_rate=learning_rate)
+                            strategy.add(balance)
+                            strategy.add(rationalization)
+                            strategies.append(strategy)
 
     return strategies * repeats
 
@@ -77,6 +82,8 @@ def main():
     parser.add_argument("-m", help="Dimension m", type=int, default=3)
     parser.add_argument("-p", help="Dimension p", type=int, default=3)
     parser.add_argument("--rank", help="Decomposition rank", type=int, default=23)
+    parser.add_argument("-s", help="Number of symmetric components (only when n=m=p)", type=int, default=0)
+    parser.add_argument("-t", help="Number of cyclic triplets (only when n=m=p)", type=int, default=0)
     parser.add_argument("--data-type", help="Coefficients data type", choices=["complex64", "complex128", "float32", "float64"], default="float32")
     parser.add_argument("--batch-size", help="Batch size", type=int, default=2048)
     parser.add_argument("--device", help="Torch device", type=str, default="cuda")
@@ -87,10 +94,24 @@ def main():
     parser.add_argument("-o", "--output-dir", help="Directory to save discovered decompositions", type=str, default="discovered_decompositions")
     args = parser.parse_args()
 
+    use_cyclic = args.s > 0 or args.t > 0
+    if use_cyclic:
+        if not (args.n == args.m == args.p):
+            parser.error("Cyclic symmetry parameters -s and -t require n=m=p (cubic tensors only)")
+
+        rank = args.s + 3 * args.t
+        if args.rank != rank:
+            parser.error(f"Rank mismatch: --rank={args.rank}, but s + 3*t = {args.s} + 3*{args.t} = {rank}. With cyclic symmetry, rank must equal s + 3*t.")
+
     output_dir = os.path.join(args.output_dir, f"{args.n}x{args.m}x{args.p}", f"rank{args.rank}")
     os.makedirs(output_dir, exist_ok=True)
 
     print(f"Starting fast matmul decomposition search for {args.n}x{args.m}x{args.p} with rank {args.rank} using different strategies")
+    if use_cyclic:
+        print(f"- decomposition type: cyclic symmetric (s = {args.s}, t = {args.t})")
+    else:
+        print(f"- decomposition type: usual")
+
     print(f"- data type: {args.data_type}")
     print(f"- batch size: {args.batch_size}")
     print(f"- device: {args.device}")
@@ -101,7 +122,11 @@ def main():
     print(f"- output directory: {output_dir}")
 
     dtype = get_dtype(args.data_type)
-    decomposition = Decomposition(n=args.n, m=args.m, p=args.p, rank=args.rank, dtype=dtype, batch_size=args.batch_size, device=args.device)
+
+    if use_cyclic:
+        decomposition = CyclicDecomposition(n=args.n, s=args.s, t=args.t, rank=args.rank, dtype=dtype, batch_size=args.batch_size, device=args.device)
+    else:
+        decomposition = Decomposition(n=args.n, m=args.m, p=args.p, rank=args.rank, dtype=dtype, batch_size=args.batch_size, device=args.device)
 
     strategies = init_strategies(learning_rate=args.learning_rate)
     target_tensor = get_matmul_tensor(n=args.n, m=args.m, p=args.p, device=args.device, dtype=dtype)

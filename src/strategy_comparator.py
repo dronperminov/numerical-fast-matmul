@@ -4,13 +4,13 @@ from typing import Dict, List
 import torch
 
 from src.decomposition_solver import DecompositionSolver
-from src.entities.decomposition import Decomposition
+from src.decompositions import AbstractDecomposition
 from src.entities.train_strategy import TrainStrategy
 from src.utils import pretty_time
 
 
 class StrategyComparator:
-    def __init__(self, decomposition: Decomposition, strategies: List[TrainStrategy], T: torch.Tensor, output_dir: str) -> None:
+    def __init__(self, decomposition: AbstractDecomposition, strategies: List[TrainStrategy], T: torch.Tensor, output_dir: str) -> None:
         self.decomposition = decomposition
         self.strategies = strategies
         self.T = T
