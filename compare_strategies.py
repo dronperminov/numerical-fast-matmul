@@ -100,8 +100,8 @@ def main():
             parser.error("Cyclic symmetry parameters -s and -t require n=m=p (cubic tensors only)")
 
         rank = args.s + 3 * args.t
-        if args.rank != rank:
-            parser.error(f"Rank mismatch: --rank={args.rank}, but s + 3*t = {args.s} + 3*{args.t} = {rank}. With cyclic symmetry, rank must equal s + 3*t.")
+        if args.rank < rank:
+            parser.error(f"Rank mismatch: --rank={args.rank}, but s + 3*t = {args.s} + 3*{args.t} = {rank}. With cyclic symmetry, rank must greater or equal s + 3*t.")
 
     output_dir = os.path.join(args.output_dir, f"{args.n}x{args.m}x{args.p}", f"rank{args.rank}")
     os.makedirs(output_dir, exist_ok=True)
