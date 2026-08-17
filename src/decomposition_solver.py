@@ -25,9 +25,12 @@ class DecompositionSolver:
         self.best_errors = torch.full((self.batch_size,), float('inf'), dtype=torch.float64, device=self.device)
         self.verified_mask = torch.zeros(self.batch_size, dtype=torch.bool, device=self.device)
 
-    def step(self, step: int, steps: int, print_verified: bool = True) -> float:
-        parameters, t = self.strategy.get(step=step, steps=steps)
-        loss = self.__train_step(parameters=parameters, t=t)
+    def step(self, step: int, print_verified: bool = True) -> None:
+        if step >= self.strategy.steps:
+            return
+
+        parameters, t = self.strategy.get(step=step)
+        self.__train_step(parameters=parameters, t=t)
         self.__verify(print_verified=print_verified)
 
         if parameters.project_alpha(t):
@@ -41,8 +44,6 @@ class DecompositionSolver:
         if parameters.project_alpha(t):
             self.decomposition.project_to_rounded(scale=max(self.strategy.scales), alpha=parameters.project_alpha(t))
             self.__verify(print_verified=print_verified)
-
-        return loss
 
     def status(self) -> None:
         with torch.no_grad():
@@ -73,7 +74,7 @@ class DecompositionSolver:
     def verified_count(self) -> int:
         return self.verified_mask.sum().item()
 
-    def __train_step(self, parameters: TrainParameters, t: float) -> float:
+    def __train_step(self, parameters: TrainParameters, t: float) -> None:
         self.optimizer.zero_grad()
         loss = self.__get_loss(parameters=parameters, t=t)
         loss = loss.sum()
@@ -81,7 +82,6 @@ class DecompositionSolver:
 
         torch.nn.utils.clip_grad_norm_(self.decomposition.get_parameters(), max_norm=5.0)
         self.optimizer.step()
-        return loss.item() / self.batch_size
 
     def __verify(self, print_verified: bool) -> None:
         for scale in self.strategy.scales:

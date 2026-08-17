@@ -10,7 +10,7 @@ from src.strategy_comparator import StrategyComparator
 from src.utils import get_dtype, get_matmul_tensor
 
 
-def init_strategies(learning_rate: float, repeats: int = 2) -> List[TrainStrategy]:
+def init_strategies(learning_rate: float, steps: int, repeats: int = 2) -> List[TrainStrategy]:
     strategies = [
         TrainStrategy.default(learning_rate=learning_rate)
     ]
@@ -68,7 +68,7 @@ def init_strategies(learning_rate: float, repeats: int = 2) -> List[TrainStrateg
                             )
 
                             label = f"[ALS{als_probability:.2f}]-[E{end_part}]-[|{max_abs_value}|]-[P{project_name}]-[S{sparsity_name}]-[R{rat_name}]-[lr{learning_rate}]"
-                            strategy = TrainStrategy(label=label, scales=[1, 2], learning_rate=learning_rate)
+                            strategy = TrainStrategy(label=label, scales=[1, 2], learning_rate=learning_rate, steps=steps)
                             strategy.add(balance)
                             strategy.add(rationalization)
                             strategies.append(strategy)
@@ -128,13 +128,13 @@ def main():
     else:
         decomposition = Decomposition(n=args.n, m=args.m, p=args.p, rank=args.rank, dtype=dtype, batch_size=args.batch_size, device=args.device)
 
-    strategies = init_strategies(learning_rate=args.learning_rate)
+    strategies = init_strategies(learning_rate=args.learning_rate, steps=args.steps)
     target_tensor = get_matmul_tensor(n=args.n, m=args.m, p=args.p, device=args.device, dtype=dtype)
 
     comparator = StrategyComparator(decomposition=decomposition, strategies=strategies, T=target_tensor, output_dir=output_dir)
 
     while True:
-        comparator.run(epochs=args.epochs, steps=args.steps, log_period=args.log_period, print_verified=False)
+        comparator.run(epochs=args.epochs, log_period=args.log_period, print_verified=False)
 
 
 if __name__ == '__main__':

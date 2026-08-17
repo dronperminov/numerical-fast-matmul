@@ -53,7 +53,7 @@ def main():
     print(f"- logging period: {args.log_period} steps")
     print(f"- output directory: {output_dir}")
 
-    strategy = TrainStrategy.default(learning_rate=args.learning_rate)
+    strategy = TrainStrategy.default(learning_rate=args.learning_rate, steps=args.steps)
 
     dimension = f"({args.n}, {args.m}, {args.p}: {args.rank})"
     dtype = get_dtype(args.data_type)
@@ -69,11 +69,11 @@ def main():
         solver = DecompositionSolver(decomposition=decomposition, strategy=strategy, T=target_tensor, output_dir=output_dir)
 
         for epoch in range(args.epochs):
-            for step in range(args.steps):
-                loss = solver.step(step, args.steps, print_verified=False)
+            for step in range(strategy.steps):
+                solver.step(step, print_verified=False)
 
                 if step % args.log_period == 0:
-                    print(f"\n{dimension}: run {restart + 1}, epoch {epoch + 1} / {args.epochs}, step {step} / {args.steps}, loss: {loss}")
+                    print(f"\n{dimension}: run {restart + 1}, epoch {epoch + 1} / {args.epochs}, step {step} / {args.steps}")
                     print("| reconstruction | rounded recons. (mean / min / best) | rationalization | magnitude |   balance   | verified |")
                     print("+----------------+-------------------------------------+-----------------+-----------+-------------+----------+")
                     solver.status()

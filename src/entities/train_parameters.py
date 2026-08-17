@@ -22,11 +22,10 @@ class TrainParameters:
         return TrainParameters(
             end_part=1.0,
             w_rationalization=lambda t: 0.25 * t * t * (1 + math.cos(10 * math.pi * t * t)) / 2,
-            w_sparsity=lambda t: 0.008 * t,
             w_magnitude=lambda t: 0.1 * t,
             w_balance=lambda t: 0.01,
             rationalization_type="ternary",
             sparsity_type="sqrt",
-            max_abs_value=3.0,
+            max_abs_value=1.5,
             als_probability=0.75
         )

@@ -22,21 +22,22 @@ class StrategyComparator:
         self.verified_total = {strategy.label: 0 for strategy in self.strategies}
         self.label2count = self.__get_labels_count()
         self.runs = 0
+        self.max_steps = max(strategy.steps for strategy in self.strategies)
 
-    def run(self, epochs: int, steps: int, log_period: int, print_verified: bool) -> None:
+    def run(self, epochs: int, log_period: int, print_verified: bool) -> None:
         self.decomposition.initialize()
         self.solvers = [DecompositionSolver(self.decomposition.copy(), strategy, self.T, self.output_dir) for strategy in self.strategies]
         self.runs += 1
-        self.__status(0, -1, steps)
+        self.__status(0, -1)
         start_time = time.time()
 
         for epoch in range(epochs):
-            for step in range(steps):
-                self.__step(step, steps, print_verified=print_verified)
+            for step in range(self.max_steps):
+                self.__step(step, print_verified=print_verified)
 
-                if (step + 1) % log_period == 0 or step == steps - 1:
+                if (step + 1) % log_period == 0 or step == self.max_steps - 1:
                     end_time = time.time()
-                    self.__status(epoch, step, steps, elapsed=end_time - start_time)
+                    self.__status(epoch, step, elapsed=end_time - start_time)
                     start_time = end_time
 
         for solver in self.solvers:
@@ -55,13 +56,13 @@ class StrategyComparator:
                 mean = f", mean: {self.verified_total[label] / (self.runs * self.label2count[label]):.1f}" if self.runs > 1 else ""
                 print(f"{label}: {count}{mean}")
 
-    def __step(self, step: int, steps: int, print_verified: bool = True) -> None:
+    def __step(self, step: int, print_verified: bool = True) -> None:
         for solver in self.solvers:
-            solver.step(step=step, steps=steps, print_verified=print_verified)
+            solver.step(step=step, print_verified=print_verified)
 
-    def __status(self, epoch: int, step: int, steps: int, elapsed: float = 0.0) -> None:
+    def __status(self, epoch: int, step: int, elapsed: float = 0.0) -> None:
         n, m, p = self.decomposition.dimension
-        print(f"\n({n}, {m}, {p}: {self.decomposition.rank}): run: {self.runs}, epoch {epoch + 1}, step {step + 1} / {steps}, elapsed: {pretty_time(elapsed)}")
+        print(f"\n({n}, {m}, {p}: {self.decomposition.rank}): run: {self.runs}, epoch {epoch + 1}, step {step + 1} / {self.max_steps}, elapsed: {pretty_time(elapsed)}")
         print(f'| {"strategy":{self.label_len}} | reconstruction | rounded recons. (mean / min / best) | rationalization | magnitude |   balance   | verified |')
         print(f'+-{"-" * self.label_len}-+----------------+-------------------------------------+-----------------+-----------+-------------+----------+')
 

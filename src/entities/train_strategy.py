@@ -4,10 +4,11 @@ from src.entities.train_parameters import TrainParameters
 
 
 class TrainStrategy:
-    def __init__(self, label: str, scales: List[int], learning_rate: float, optimizer_name: str = "adam"):
+    def __init__(self, label: str, scales: List[int], learning_rate: float, steps: int, optimizer_name: str = "adam"):
         self.label = label
         self.scales = scales
         self.learning_rate = learning_rate
+        self.steps = steps
         self.optimizer_name = optimizer_name
         self.parameters = []
         self.default_parameters = TrainParameters.default()
@@ -15,33 +16,32 @@ class TrainStrategy:
     def add(self, parameters: TrainParameters):
         self.parameters.append(parameters)
 
-    def get(self, step: int, steps: int) -> Tuple[TrainParameters, float]:
+    def get(self, step: int) -> Tuple[TrainParameters, float]:
         start_step = 0
 
         for parameters in self.parameters:
-            end_step = int(parameters.end_part * steps)
+            end_step = int(parameters.end_part * self.steps)
             if step < end_step:
                 t = (step - start_step) / (end_step - start_step)
                 return parameters, t
 
             start_step = end_step
 
-        return self.default_parameters, step / steps
+        return self.default_parameters, step / self.steps
 
     @staticmethod
-    def default(learning_rate: float = 0.1) -> "TrainStrategy":
+    def default(learning_rate: float = 0.1, steps: int = 2000) -> "TrainStrategy":
         balance = TrainParameters(
             end_part=0.4,
             w_rationalization=lambda t: 0,
             w_sparsity=lambda t: 0,
-            w_magnitude=lambda t: 0.1 * t,
-            w_balance=lambda t: 0.05,
-            max_abs_value=3.0,
-            als_probability=0.75,
-            project_alpha=lambda t: 0.01
+            w_magnitude=lambda t: 0.01,
+            w_balance=lambda t: 0.01,
+            max_abs_value=1.5,
+            als_probability=0.75
         )
 
-        strategy = TrainStrategy(label="default", scales=[1, 2], learning_rate=learning_rate, optimizer_name="adam")
+        strategy = TrainStrategy(label="default", scales=[1, 2], learning_rate=learning_rate, steps=steps, optimizer_name="adam")
         strategy.add(balance)
         strategy.add(TrainParameters.default())
         return strategy
