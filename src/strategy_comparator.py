@@ -1,3 +1,4 @@
+import gc
 import time
 from typing import Dict, List
 
@@ -41,6 +42,19 @@ class StrategyComparator:
         for solver in self.solvers:
             self.verified_total[solver.strategy.label] += solver.verified_count()
 
+        self.__free_memory()
+
+    def print_statistics(self) -> None:
+        if sum(self.verified_total.values()) == 0:
+            return
+
+        n, m, p = self.decomposition.dimension
+        print(f"\n({n}, {m}, {p}: {self.decomposition.rank}): run: {self.runs}")
+        for label, count in sorted(self.verified_total.items(), key=lambda item: (-item[1], item[0])):
+            if count:
+                mean = f", mean: {self.verified_total[label] / (self.runs * self.label2count[label]):.1f}" if self.runs > 1 else ""
+                print(f"{label}: {count}{mean}")
+
     def __step(self, step: int, steps: int, print_verified: bool = True) -> None:
         for solver in self.solvers:
             solver.step(step=step, steps=steps, print_verified=print_verified)
@@ -81,3 +95,9 @@ class StrategyComparator:
             label2count[strategy.label] += 1
 
         return label2count
+
+    def __free_memory(self) -> None:
+        del self.solvers
+        gc.collect()
+        torch.cuda.empty_cache()
+        self.solvers = []
