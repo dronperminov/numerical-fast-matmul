@@ -15,6 +15,7 @@ class TrainParameters:
     max_abs_value: float = 3.0
     als_probability: float = 0.0
     project_alpha: Callable[[float], float] = lambda t: 0.0
+    target_noise_std: Callable[[float], float] = lambda t: 0.0
 
     @staticmethod
     def default() -> "TrainParameters":

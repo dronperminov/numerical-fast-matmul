@@ -101,9 +101,10 @@ class DecompositionSolver:
         w_sparsity = parameters.w_sparsity(t)
         w_magnitude = parameters.w_magnitude(t)
         w_balance = parameters.w_balance(t)
+        noise_std = parameters.target_noise_std(t)
 
         u, v, w = self.decomposition.get_coefficients()
-        loss = reconstruction_loss(target=self.T, u=u, v=v, w=w)
+        loss = reconstruction_loss(target=self.T, u=u, v=v, w=w, noise_std=noise_std)
 
         if w_rationalization:
             loss += w_rationalization * rationalization_loss(u, v, w, rationalization_type=parameters.rationalization_type)
