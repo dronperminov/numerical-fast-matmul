@@ -53,7 +53,7 @@ class StrategyComparator:
         print(f"\n({n}, {m}, {p}: {self.decomposition.rank}): run: {self.runs}")
         for label, count in sorted(self.verified_total.items(), key=lambda item: (-item[1], item[0])):
             if count:
-                mean = f", mean: {self.verified_total[label] / (self.runs * self.label2count[label]):.1f}" if self.runs > 1 else ""
+                mean = f", mean: {self.verified_total[label] / (self.runs * self.label2count[label]):.4f}" if self.runs > 1 else ""
                 print(f"{label}: {count}{mean}")
 
     def __step(self, step: int, print_verified: bool = True) -> None:
@@ -79,7 +79,7 @@ class StrategyComparator:
 
         for label, count in sorted(total.items(), key=lambda item: (-item[1], item[0])):
             if count:
-                mean = f", mean: {self.verified_total[label] / ((self.runs - 1) * self.label2count[label]):.1f}" if self.runs > 1 else ""
+                mean = f", mean: {self.verified_total[label] / ((self.runs - 1) * self.label2count[label]):.4f}" if self.runs > 1 else ""
                 print(f"{label}: {verified[label]} schemes (total: {count}{mean})")
 
     def __get_verified_count(self) -> Dict[str, int]:

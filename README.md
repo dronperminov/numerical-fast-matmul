@@ -96,6 +96,48 @@ Additional argument of `find_decomposition.py`:
 * `--restarts` — number of independent random restarts.
 
 
+### Search for multiple dimensions and ranks (`find_multiple_decompositions.py`)
+
+This script is designed for systematic search across multiple tensor dimensions and ranks simultaneously. 
+It initializes a set of optimization strategies and applies them to multiple decomposition problems 
+($n \times m \times p$ with different ranks) in parallel, cycling through them until stopped.
+
+Key features:
+- **Multi-target search**: searches for decompositions for multiple `(n, m, p)` dimensions and ranks.
+- **Strategy battery**: uses a predefined set of strategies with different combinations of ALS, rationalization, and projection parameters.
+- **Automatic directory organization**: saves discovered decompositions in structured subdirectories (`output_dir/{n}x{m}x{p}/rank{r}/`).
+- **Continuous execution**: runs in an infinite loop, allowing it to keep searching until manually stopped, accumulating discoveries over time.
+
+Usage:
+```bash
+python find_multiple_decompositions.py
+```
+
+The script has a hardcoded dictionary `dimension2ranks` that specifies which dimensions and ranks to search for. You can modify this dictionary
+to add new target configurations:
+
+```python
+dimension2ranks = {
+    (2, 4, 4): [26],
+    (2, 4, 5): [32, 33],
+    (2, 4, 6): [39],
+    (3, 3, 5): [36, 37]
+    # Add more configurations here
+}
+```
+
+#### Command-line arguments
+
+The script accepts the same arguments as `find_decomposition.py`, except for `--restarts`:
+- `--data-type` — coefficients data type (`float32`, `float64`, `complex64` or `complex128`, `float32` by default);
+- `--batch-size` — number of decompositions optimized simultaneously (`2048` by default);
+- `--device` — torch device (`cuda` by default);
+- `--learning-rate` — optimizer learning rate (`0.1` by default);
+- `--epochs` — number of epochs per experiment (`1` by default);
+- `--log-period` — logging frequency (`100` by default);
+- `-o` — directory for discovered decompositions (`discovered_decompositions` by default).
+
+
 ## Saved decompositions
 
 Every verified decomposition is automatically saved as a JSON file.
